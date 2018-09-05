@@ -1,0 +1,173 @@
+
+//Server
+import java.io.*;
+import java.net.*;
+import java.util.*;
+public class Server
+{
+	static int i=0;
+	static List<ClientHandler> clients=new ArrayList<ClientHandler>();
+	public static void main(String a[])
+	{	
+		try
+		{
+			ServerSocket servsock=new ServerSocket(9999);
+			Socket clientsock=null;			
+			Scanner scan=new Scanner(System.in);
+			
+			while (true) 
+			{ // 
+				clientsock=servsock.accept();
+				DataInputStream is=new DataInputStream(clientsock.getInputStream());
+				DataOutputStream os=new DataOutputStream(clientsock.getOutputStream());
+				System.out.println("Connected Client:"+i);
+				ClientHandler cl=new ClientHandler("client"+(i++),clientsock,is,os);
+				Thread th=new Thread(cl);
+				clients.add(cl);
+				th.start();
+			}
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+	}
+}
+
+class ClientHandler implements Runnable
+{
+	static boolean logged;
+	DataInputStream is=null;
+	DataOutputStream os=null;
+	String name;
+	Socket clientsock=null;
+	ClientHandler(String name,Socket clientsock,DataInputStream is,DataOutputStream os)
+	{
+		this.name=name;
+		this.clientsock=clientsock;
+		this.is=is;
+		this.os=os;
+		logged=true;		
+	}
+	public void run()
+	{
+		String read,message,recipient;
+		try
+		{
+			this.os.writeUTF("Your client id is:"+name+"\nEnter message@userid");
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+		while(true)
+		{
+			try
+			{
+				read=is.readUTF();
+				if (read.equals("end")) 
+				{
+					this.logged=false;
+					System.out.println("client "+this.name+" disconnected");
+					is.close();
+					os.close();
+					clientsock.close(); 
+					break;
+				}
+				else
+				{
+					String s[]=read.split("@");
+					message=s[0];
+					recipient=s[1];
+					for(ClientHandler chl : Server.clients)
+					{
+						if(chl.name.equals(recipient) && chl.logged==true)
+						{
+							chl.os.writeUTF("client:"+name+" message:"+message);
+							break;
+						}
+					}
+				}
+			}
+			catch (Exception e)
+			{
+				e.printStackTrace();
+			}
+			
+		}//while
+		try
+		{
+			this.os.close();
+			this.is.close();
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+		
+	}
+}
+
+//Client
+
+import java.io.*;
+import java.net.*;
+import java.util.*;
+public class Client
+{
+	static String msgin="",msgout="";
+	public static void main(String a[])
+	{	
+		try
+		{
+			InetAddress inet=InetAddress.getByName("localhost");
+			Socket clientsock=new Socket(inet,9999);
+			DataInputStream is=new DataInputStream(clientsock.getInputStream());
+			DataOutputStream os=new DataOutputStream(clientsock.getOutputStream());
+			Scanner scan=new Scanner(System.in);
+			Thread send=new Thread(new Runnable(){
+				public void run()
+				{
+					while(true)
+					{
+						try
+						{
+							msgout=scan.nextLine();
+							os.writeUTF(msgout);
+						}
+						catch(Exception e)
+						{
+							e.printStackTrace();
+						}
+					}
+				}
+			});//thread send
+			Thread receive=new Thread(new Runnable(){
+				public void run()
+				{
+					while(true)
+					{
+						try
+						{
+							msgin=is.readUTF();
+							System.out.println("Reply:"+msgin);
+						}					
+						catch(Exception e)
+						{
+							System.out.println("You disconnected");
+							break;
+						}
+					}
+				}
+			});//thread receive
+			send.start();
+			receive.start();
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+	}
+}
+
+
